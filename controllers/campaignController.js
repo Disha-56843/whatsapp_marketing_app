@@ -349,7 +349,7 @@
 
 import express from 'express';
 import Campaign from '../models/campaignModel.js';
-import Contact from '../models/Contact.js';
+import Contact from '../models/contactModel.js';
 
 const router = express.Router();
 
