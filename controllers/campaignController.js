@@ -348,7 +348,7 @@
 
 
 import express from 'express';
-import Campaign from '../models/Campaign.js';
+import Campaign from '../models/campaignModel.js';
 import Contact from '../models/Contact.js';
 
 const router = express.Router();
