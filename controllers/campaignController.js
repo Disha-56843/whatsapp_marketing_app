@@ -354,7 +354,14 @@ import Contact from "../models/contactModel.js";
 // ============================================
 export const createCampaign = async (req, res) => {
   try {
-    const { name, message, targetContacts, scheduledAt } = req.body;
+    const {
+      name,
+      message,
+      targetContacts,
+      scheduledAt,
+      mediaPath,
+      mediaType
+    } = req.body;
     const userId = req.userId; // From auth middleware
 
     console.log('📥 POST /campaigns');
@@ -395,6 +402,8 @@ export const createCampaign = async (req, res) => {
       message,
       targetContacts,
       scheduledAt,
+      mediaPath,
+      mediaType,
       owner: userId,
       status: 'draft',
       stats: {
