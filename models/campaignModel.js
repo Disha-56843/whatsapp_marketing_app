@@ -21,6 +21,12 @@ const campaignSchema = new mongoose.Schema({
   scheduledAt: { 
     type: Date 
   },
+  mediaPath: {
+    type: String
+  },
+  mediaType: {
+    type: String
+  },
   stats: {
     sent: { type: Number, default: 0 },
     delivered: { type: Number, default: 0 },
