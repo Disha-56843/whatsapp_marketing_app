@@ -1,52 +1,90 @@
+// // import mongoose from "mongoose";
+
+// // const contactSchema = new mongoose.Schema(
+// //   {
+// //     name: { type: String, required: true },
+// //     phone: { type: String, required: true },
+// //     batchName: { type: String, required: true }, // unique for each upload
+// //   },
+// //   { timestamps: true }
+// // );
+
+// // const Contact = mongoose.model("Contact", contactSchema);
+// // export default Contact;
+
 // import mongoose from "mongoose";
 
 // const contactSchema = new mongoose.Schema(
 //   {
-//     name: { type: String, required: true },
-//     phone: { type: String, required: true },
-//     batchName: { type: String, required: true }, // unique for each upload
+//     name: { 
+//       type: String, 
+//       required: true 
+//     },
+//     phone: { 
+//       type: String, 
+//       required: true 
+//     },
+//     email: {
+//       type: String,
+//       default: null
+//     },
+//     tags: [{
+//       type: String
+//     }],
+//     batchName: { 
+//       type: String, 
+//       default: 'default'  // ← Changed: not required anymore
+//     },
+//     owner: { 
+//       type: mongoose.Schema.Types.ObjectId, 
+//       ref: 'User',
+//       required: true  // ← This is why you're getting the error
+//     }
 //   },
 //   { timestamps: true }
 // );
 
+// // Index for faster queries
+// contactSchema.index({ owner: 1, phone: 1 });
+
 // const Contact = mongoose.model("Contact", contactSchema);
 // export default Contact;
-
 
 import mongoose from "mongoose";
 
 const contactSchema = new mongoose.Schema(
   {
-    name: { 
-      type: String, 
-      required: true 
+    name: {
+      type: String,
+      required: [true, "Name is required"],
+      trim: true,
     },
-    phone: { 
-      type: String, 
-      required: true 
+    phone: {
+      type: String,
+      required: [true, "Phone number is required"],
+      trim: true,
     },
     email: {
       type: String,
-      default: null
+      default: null,
+      trim: true,
+      lowercase: true,
     },
-    tags: [{
-      type: String
-    }],
-    batchName: { 
-      type: String, 
-      required: true 
+    tags: [{ type: String, trim: true }],
+    batchName: {
+      type: String,
+      default: "default",
     },
-    owner: { 
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: 'User',
-      required: true 
-    }
+    owner: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
   },
   { timestamps: true }
 );
 
-// Index for faster queries
-contactSchema.index({ owner: 1, phone: 1 });
+// Compound index: one phone per user
+contactSchema.index({ owner: 1, phone: 1 }, { unique: true });
 
-const Contact = mongoose.model("Contact", contactSchema);
-export default Contact;
+export default mongoose.model("Contact", contactSchema);
