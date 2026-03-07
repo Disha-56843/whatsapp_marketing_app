@@ -1,16 +1,20 @@
-// emailService.js - Using Resend (resend.com)
-// Install: npm install resend
+import nodemailer from "nodemailer";
 
 // Generate 6-digit OTP
 export const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Send OTP email via Resend
+// Send OTP email via Gmail
 export const sendOTPEmail = async (email, otp, type = "verify") => {
   try {
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
+    const transporter = nodemailer.createTransport({
+      service: "gmail",   // let nodemailer handle Gmail settings automatically
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS, // Gmail App Password
+      },
+    });
 
     const subjects = {
       verify: "Verify Your Email - WhatsApp Marketing",
@@ -24,8 +28,8 @@ export const sendOTPEmail = async (email, otp, type = "verify") => {
       login: `Your login verification OTP is: <strong>${otp}</strong>`,
     };
 
-    const { data, error } = await resend.emails.send({
-      from: process.env.EMAIL_FROM || "WhatsApp Marketing <onboarding@resend.dev>",
+    await transporter.sendMail({
+      from: `"WhatsApp Marketing" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: subjects[type] || subjects.verify,
       html: `
@@ -42,15 +46,10 @@ export const sendOTPEmail = async (email, otp, type = "verify") => {
       `,
     });
 
-    if (error) {
-      console.error("❌ Resend error:", error);
-      throw new Error(error.message);
-    }
-
-    console.log(`✅ OTP email sent to: ${email} (id: ${data.id})`);
+    console.log(`✅ OTP email sent to: ${email}`);
     return true;
   } catch (error) {
     console.error("❌ Email send error:", error.message);
-    throw new Error("Failed to send OTP email. Check your RESEND_API_KEY.");
+    throw new Error("Failed to send OTP email. Check your EMAIL_USER and EMAIL_PASS.");
   }
 };
