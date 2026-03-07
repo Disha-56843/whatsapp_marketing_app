@@ -22,12 +22,8 @@ const userSchema = new mongoose.Schema(
     },
     isEmailVerified: {
       type: Boolean,
-      default: false,
+      default: true, // Auto-verified until we have a domain
     },
-    emailVerifyOTP: { type: String, default: null },
-    emailVerifyOTPExpires: { type: Date, default: null },
-    passwordResetOTP: { type: String, default: null },
-    passwordResetOTPExpires: { type: Date, default: null },
   },
   { timestamps: true }
 );
@@ -35,10 +31,6 @@ const userSchema = new mongoose.Schema(
 userSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.password;
-  delete obj.emailVerifyOTP;
-  delete obj.emailVerifyOTPExpires;
-  delete obj.passwordResetOTP;
-  delete obj.passwordResetOTPExpires;
   return obj;
 };
 
