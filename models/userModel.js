@@ -1,14 +1,3 @@
-// import mongoose from "mongoose";
-
-// const userSchema = new mongoose.Schema({
-//   name: { type: String, required: true },
-//   email: { type: String, required: true, unique: true },
-//   password: { type: String, required: true },
-// }, { timestamps: true });
-
-// export default mongoose.model("User", userSchema);
-
-
 import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
@@ -29,37 +18,20 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       required: [true, "Password is required"],
-      minlength: [6, "Password must be at least 6 characters"],
+      select: false,
     },
-
-    // ─── Email Verification ───────────────────────────────
     isEmailVerified: {
       type: Boolean,
       default: false,
     },
-    emailVerifyOTP: {
-      type: String,
-      default: null,
-    },
-    emailVerifyOTPExpires: {
-      type: Date,
-      default: null,
-    },
-
-    // ─── Password Reset ───────────────────────────────────
-    passwordResetOTP: {
-      type: String,
-      default: null,
-    },
-    passwordResetOTPExpires: {
-      type: Date,
-      default: null,
-    },
+    emailVerifyOTP: { type: String, default: null },
+    emailVerifyOTPExpires: { type: Date, default: null },
+    passwordResetOTP: { type: String, default: null },
+    passwordResetOTPExpires: { type: Date, default: null },
   },
   { timestamps: true }
 );
 
-// Hide sensitive fields in JSON output
 userSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.password;
