@@ -13,6 +13,10 @@ import campaignRoutes from "./routes/campaignRoutes.js";
 
 const app = express();
 
+// ✅ FIX: Trust Render's proxy — MUST be before rate limiter
+// Without this, express-rate-limit crashes with ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
+app.set("trust proxy", 1);
+
 app.use(helmet());
 
 app.use(

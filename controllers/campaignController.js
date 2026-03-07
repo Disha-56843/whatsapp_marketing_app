@@ -446,8 +446,9 @@ export const getCampaigns = async (req, res) => {
     
     console.log(`✅ Found ${campaigns.length} campaigns`);
     
-    // Return campaigns directly as array (not wrapped in object)
-    res.json(campaigns);
+    // ✅ FIX: Wrap in object — Flutter reads response['campaigns']
+    // Previously returned raw array which Flutter couldn't parse
+    res.json({ success: true, campaigns, count: campaigns.length });
     
   } catch (error) {
     console.error("❌ Error fetching campaigns:", error);
