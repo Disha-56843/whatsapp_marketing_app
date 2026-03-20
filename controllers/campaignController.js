@@ -348,6 +348,79 @@
 import Campaign from "../models/campaignModel.js";
 import MessageLog from "../models/messageLogModel.js";
 import Contact from "../models/contactModel.js";
+import { sendWhatsAppMessage, validateWhatsAppConfig } from "../utils/whatsappCloudService.js";
+
+const getPublicBaseUrl = (req) =>
+  process.env.BACKEND_PUBLIC_URL ||
+  process.env.RENDER_EXTERNAL_URL ||
+  `${req.protocol}://${req.get("host")}`;
+
+const dispatchCampaignMessages = async ({ campaignId, userId }) => {
+  const campaign = await Campaign.findOne({
+    _id: campaignId,
+    owner: userId,
+  }).populate("targetContacts", "name phone");
+
+  if (!campaign) return;
+
+  const mediaUrl =
+    campaign.mediaPath && /^https?:\/\//i.test(campaign.mediaPath)
+      ? campaign.mediaPath
+      : null;
+
+  let sent = 0;
+  let failed = 0;
+
+  for (const contact of campaign.targetContacts) {
+    try {
+      const result = await sendWhatsAppMessage({
+        to: contact.phone,
+        text: campaign.message,
+        mediaUrl,
+        mediaType: campaign.mediaType,
+      });
+
+      await MessageLog.create({
+        campaignId: campaign._id,
+        contactId: contact._id,
+        to: contact.phone,
+        body: campaign.message,
+        status: "sent",
+        type: "outgoing",
+        error: null,
+        timestamp: new Date(),
+      });
+
+      if (result?.messages?.length) {
+        sent += 1;
+      } else {
+        failed += 1;
+      }
+    } catch (error) {
+      failed += 1;
+      await MessageLog.create({
+        campaignId: campaign._id,
+        contactId: contact._id,
+        to: contact.phone,
+        body: campaign.message,
+        status: "failed",
+        type: "outgoing",
+        error: error.message,
+        timestamp: new Date(),
+      });
+    }
+  }
+
+  campaign.stats = {
+    sent,
+    delivered: 0,
+    read: 0,
+    failed,
+  };
+  campaign.sentAt = new Date();
+  campaign.status = failed === campaign.targetContacts.length ? "failed" : "completed";
+  await campaign.save();
+};
 
 // ============================================
 // CREATE NEW CAMPAIGN
@@ -521,25 +594,83 @@ export const sendCampaign = async (req, res) => {
       });
     }
 
-    // Update campaign status
+    if (!validateWhatsAppConfig()) {
+      return res.status(500).json({
+        success: false,
+        message: "WhatsApp Cloud API is not configured on the server"
+      });
+    }
+
+    await MessageLog.deleteMany({ campaignId: campaign._id });
     campaign.status = 'sending';
+    campaign.sentAt = null;
+    campaign.stats = {
+      sent: 0,
+      delivered: 0,
+      read: 0,
+      failed: 0
+    };
     await campaign.save();
 
-    console.log('✅ Campaign status updated to sending');
+    setImmediate(() => {
+      dispatchCampaignMessages({
+        campaignId: campaign._id,
+        userId
+      }).catch(async (error) => {
+        console.error("❌ Background campaign dispatch error:", error);
+        await Campaign.updateOne(
+          { _id: campaign._id, owner: userId },
+          {
+            $set: {
+              status: "failed"
+            }
+          }
+        );
+      });
+    });
+
+    console.log('✅ Campaign dispatch started on server');
 
     res.json({ 
       success: true, 
-      message: "Campaign data ready for sending", 
-      campaign,
+      message: "Campaign started on server",
+      campaignId: campaign._id,
       totalContacts: campaign.targetContacts.length 
     });
 
   } catch (error) {
-    console.error("❌ Error preparing campaign:", error);
+    console.error("❌ Error sending campaign:", error);
     res.status(500).json({ 
       success: false,
       message: "Server error", 
       error: error.message 
+    });
+  }
+};
+
+export const uploadCampaignMedia = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Media file is required"
+      });
+    }
+
+    const mediaUrl = `${getPublicBaseUrl(req)}/uploads/${req.file.filename}`;
+
+    res.status(201).json({
+      success: true,
+      mediaUrl,
+      mediaType: req.body.mediaType || null,
+      fileName: req.file.originalname
+    });
+  } catch (error) {
+    console.error("❌ Error uploading campaign media:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message
     });
   }
 };

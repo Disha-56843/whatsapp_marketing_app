@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
+import path from "path";
+import { fileURLToPath } from "url";
 import "dotenv/config";
 import connectDB from "./config/db.js";
 import { apiLimiter } from "./middleware/rateLimiter.js";
@@ -12,6 +14,8 @@ import contactRoutes from "./routes/contactRoutes.js";
 import campaignRoutes from "./routes/campaignRoutes.js";
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // ✅ FIX: Trust Render's proxy — MUST be before rate limiter
 // Without this, express-rate-limit crashes with ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
@@ -30,6 +34,7 @@ app.use(
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 if (process.env.NODE_ENV !== "production") {
   app.use(morgan("dev"));
