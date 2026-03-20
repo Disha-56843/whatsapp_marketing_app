@@ -348,7 +348,11 @@
 import Campaign from "../models/campaignModel.js";
 import MessageLog from "../models/messageLogModel.js";
 import Contact from "../models/contactModel.js";
-import { sendWhatsAppMessage, validateWhatsAppConfig } from "../utils/whatsappCloudService.js";
+import {
+  sendWhatsAppMessage,
+  validateWhatsAppConfig,
+  getWhatsAppConfigStatus,
+} from "../utils/whatsappCloudService.js";
 
 const getPublicBaseUrl = (req) =>
   process.env.BACKEND_PUBLIC_URL ||
@@ -595,9 +599,14 @@ export const sendCampaign = async (req, res) => {
     }
 
     if (!validateWhatsAppConfig()) {
+      const cfg = getWhatsAppConfigStatus();
       return res.status(500).json({
         success: false,
-        message: "WhatsApp Cloud API is not configured on the server"
+        message: "WhatsApp Cloud API is not configured on the server",
+        config: {
+          hasPhoneNumberId: cfg.hasPhoneNumberId,
+          hasAccessToken: cfg.hasAccessToken,
+        },
       });
     }
 

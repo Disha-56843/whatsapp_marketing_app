@@ -12,6 +12,7 @@ import { apiLimiter } from "./middleware/rateLimiter.js";
 import authRoutes from "./routes/authRoutes.js";
 import contactRoutes from "./routes/contactRoutes.js";
 import campaignRoutes from "./routes/campaignRoutes.js";
+import { getWhatsAppConfigStatus } from "./utils/whatsappCloudService.js";
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -47,11 +48,18 @@ app.use("/api/v1/contacts", contactRoutes);
 app.use("/api/v1/campaigns", campaignRoutes);
 
 app.get("/api/health", (req, res) => {
+  const wa = getWhatsAppConfigStatus();
   res.json({
     success: true,
     status: "OK",
     timestamp: new Date().toISOString(),
     version: "2.0.0",
+    whatsappCloud: {
+      valid: wa.valid,
+      hasPhoneNumberId: wa.hasPhoneNumberId,
+      hasAccessToken: wa.hasAccessToken,
+      graphApiVersion: wa.graphApiVersion,
+    },
   });
 });
 
@@ -85,6 +93,7 @@ const PORT = process.env.PORT || 5000;
 
 connectDB().then(() => {
   app.listen(PORT, () => {
+    const wa = getWhatsAppConfigStatus();
     console.log("");
     console.log("=========================================");
     console.log("🚀  WhatsApp Marketing API  v2.0");
@@ -92,6 +101,9 @@ connectDB().then(() => {
     console.log(`📡  Port     : ${PORT}`);
     console.log(`🌍  Env      : ${process.env.NODE_ENV || "development"}`);
     console.log(`🔗  Base URL : http://localhost:${PORT}/api/v1`);
+    console.log(
+      `📨  WhatsApp : configured=${wa.valid} phoneId=${wa.hasPhoneNumberId} token=${wa.hasAccessToken}`
+    );
     console.log("=========================================");
     console.log("");
   });

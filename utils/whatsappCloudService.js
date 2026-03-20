@@ -89,6 +89,19 @@ export function validateWhatsAppConfig() {
   return Boolean(getPhoneNumberId() && getAccessToken());
 }
 
+export function getWhatsAppConfigStatus() {
+  const phoneNumberId = getPhoneNumberId();
+  const accessToken = getAccessToken();
+  return {
+    valid: Boolean(phoneNumberId && accessToken),
+    hasPhoneNumberId: Boolean(phoneNumberId),
+    hasAccessToken: Boolean(accessToken),
+    phoneNumberIdLength: phoneNumberId ? String(phoneNumberId).length : 0,
+    accessTokenLength: accessToken ? String(accessToken).length : 0,
+    graphApiVersion: GRAPH_API_VERSION,
+  };
+}
+
 export async function sendWhatsAppMessage({ to, text, mediaUrl, mediaType }) {
   const phoneNumberId = getPhoneNumberId();
   const accessToken = getAccessToken();
