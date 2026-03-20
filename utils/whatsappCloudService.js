@@ -1,11 +1,33 @@
 const GRAPH_API_VERSION = process.env.WHATSAPP_GRAPH_API_VERSION || "v23.0";
 
+function cleanEnv(value) {
+  if (value === undefined || value === null) return "";
+  const trimmed = String(value).trim();
+  if (!trimmed) return "";
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
 function getPhoneNumberId() {
-  return process.env.WHATSAPP_PHONE_NUMBER_ID;
+  return (
+    cleanEnv(process.env.WHATSAPP_PHONE_NUMBER_ID) ||
+    cleanEnv(process.env.WHATSAPP_PHONE_ID) ||
+    cleanEnv(process.env.PHONE_NUMBER_ID)
+  );
 }
 
 function getAccessToken() {
-  return process.env.WHATSAPP_CLOUD_API_TOKEN;
+  return (
+    cleanEnv(process.env.WHATSAPP_CLOUD_API_TOKEN) ||
+    cleanEnv(process.env.WHATSAPP_TOKEN) ||
+    cleanEnv(process.env.WHATSAPP_ACCESS_TOKEN) ||
+    cleanEnv(process.env.META_WHATSAPP_TOKEN)
+  );
 }
 
 function normalizePhone(phone) {
