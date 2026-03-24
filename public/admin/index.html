@@ -117,6 +117,10 @@
         gap: 10px;
       }
 
+      .controls.login {
+        grid-template-columns: repeat(2, minmax(220px, 1fr)) auto;
+      }
+
       input,
       button {
         border-radius: 10px;
@@ -149,6 +153,20 @@
         padding: 10px;
       }
 
+      .message {
+        margin-top: 10px;
+        font-size: 13px;
+        color: var(--soft);
+      }
+
+      .message.error {
+        color: #b91c1c;
+      }
+
+      .message.success {
+        color: #166534;
+      }
+
       @media (max-width: 780px) {
         .grid-2 {
           grid-template-columns: 1fr;
@@ -166,11 +184,23 @@
       <p class="sub">App details, database details, and usage insights.</p>
 
       <div class="panel">
+        <h3>Admin Login</h3>
+        <div class="controls login">
+          <input id="email" type="email" placeholder="Admin email" />
+          <input id="password" type="password" placeholder="Password" />
+          <button id="loginBtn">Login</button>
+        </div>
+        <div id="loginMessage" class="message"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Access Token</h3>
         <div class="controls">
-          <input id="token" type="password" placeholder="Paste admin JWT token (from login API)" />
+          <input id="token" type="password" placeholder="Admin JWT token" />
           <button id="loadBtn">Load Dashboard</button>
           <button id="refreshBtn" class="secondary">Refresh</button>
         </div>
+        <div id="dashboardMessage" class="message"></div>
       </div>
 
       <div class="panel">
@@ -232,97 +262,6 @@
       </div>
     </div>
 
-    <script>
-      const $ = (id) => document.getElementById(id);
-      let currentToken = "";
-
-      const api = async (path) => {
-        const response = await fetch(path, {
-          headers: { Authorization: `Bearer ${currentToken}` },
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.message || "Request failed");
-        return data;
-      };
-
-      const renderStats = (container, stats) => {
-        container.innerHTML = "";
-        Object.entries(stats || {}).forEach(([key, value]) => {
-          const card = document.createElement("div");
-          card.className = "stat";
-          card.innerHTML = `<small>${key}</small><strong>${value}</strong>`;
-          container.appendChild(card);
-        });
-      };
-
-      const renderRows = (tableId, rows, columns) => {
-        const tbody = document.querySelector(`#${tableId} tbody`);
-        tbody.innerHTML = "";
-        rows.forEach((row) => {
-          const tr = document.createElement("tr");
-          tr.innerHTML = columns.map((fn) => `<td>${fn(row)}</td>`).join("");
-          tbody.appendChild(tr);
-        });
-      };
-
-      const formatDate = (value) => (value ? new Date(value).toLocaleString() : "-");
-
-      const load = async () => {
-        currentToken = $("token").value.trim();
-        if (!currentToken) {
-          alert("Please paste your admin JWT token.");
-          return;
-        }
-
-        try {
-          const [overview, recent, database] = await Promise.all([
-            api("/api/v1/admin/overview"),
-            api("/api/v1/admin/recent-activity"),
-            api("/api/v1/admin/database"),
-          ]);
-
-          renderStats($("totals"), overview.totals);
-          renderStats($("usage7d"), overview.usage7d);
-
-          $("meta").innerHTML = `
-            <p><strong>Admin:</strong> ${overview.admin.name} (${overview.admin.email})</p>
-            <p><strong>Environment:</strong> ${overview.app.nodeEnv}</p>
-            <p><strong>Uptime (sec):</strong> ${overview.app.uptimeSeconds}</p>
-            <p><strong>WhatsApp Config:</strong> <span class="tag">${overview.app.whatsappCloud.valid ? "OK" : "Missing"}</span></p>
-            <p><strong>DB:</strong> ${(overview.database && overview.database.db) || "-"}</p>
-            <p><strong>Storage (MB):</strong> ${(overview.database && overview.database.storageSizeMB) || "-"}</p>
-          `;
-
-          $("campaignStatus").textContent = JSON.stringify(overview.campaignStatusBreakdown, null, 2);
-          $("messageStatus").textContent = JSON.stringify(overview.messageStatusBreakdown, null, 2);
-
-          renderRows("campaignTable", recent.recentCampaigns || [], [
-            (r) => r.name || "-",
-            (r) => `<span class="tag">${r.status || "-"}</span>`,
-            (r) => (r.owner && r.owner.email) || "-",
-            (r) => formatDate(r.createdAt),
-          ]);
-
-          renderRows("userTable", recent.recentUsers || [], [
-            (r) => r.name || "-",
-            (r) => r.email || "-",
-            (r) => `<span class="tag">${r.isAdmin ? "admin" : "user"}</span>`,
-            (r) => formatDate(r.createdAt),
-          ]);
-
-          renderRows("dbTable", database.collections || [], [
-            (r) => r.name,
-            (r) => r.documents,
-            (r) => r.indexes,
-          ]);
-        } catch (error) {
-          alert(`Unable to load dashboard: ${error.message}`);
-        }
-      };
-
-      $("loadBtn").addEventListener("click", load);
-      $("refreshBtn").addEventListener("click", load);
-    </script>
+    <script src="/admin/app.js"></script>
   </body>
 </html>
-
