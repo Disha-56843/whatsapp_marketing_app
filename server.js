@@ -12,6 +12,7 @@ import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import contactRoutes from "./routes/contactRoutes.js";
 import campaignRoutes from "./routes/campaignRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 import { apiLimiter } from "./middleware/rateLimiter.js";
 import Campaign from "./models/campaignModel.js";
 import { dispatchCampaignMessages } from "./controllers/campaignController.js";
@@ -22,6 +23,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+app.set("trust proxy", 1);
 
 // ─── Connect DB ────────────────────────────────────────────────────────────────
 await connectDB();
@@ -51,6 +53,7 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 // ─── FIX: Serve uploaded media files as static assets ────────────────────────
 // Without this the mediaUrl returned by /upload-media is a dead link.
 app.use("/uploads", express.static(uploadsDir));
+app.use("/admin", express.static(path.join(__dirname, "public/admin")));
 
 // ─── Rate limiting ─────────────────────────────────────────────────────────────
 app.use("/api", apiLimiter);
@@ -59,6 +62,11 @@ app.use("/api", apiLimiter);
 app.use("/api/auth", authRoutes);
 app.use("/api/contacts", contactRoutes);
 app.use("/api/campaigns", campaignRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/contacts", contactRoutes);
+app.use("/api/v1/campaigns", campaignRoutes);
+app.use("/api/v1/admin", adminRoutes);
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
@@ -71,6 +79,10 @@ app.get("/", (req, res) => {
 });
 
 app.get("/health", (req, res) => {
+  res.json({ status: "ok", uptime: process.uptime() });
+});
+
+app.get("/api/health", (req, res) => {
   res.json({ status: "ok", uptime: process.uptime() });
 });
 
