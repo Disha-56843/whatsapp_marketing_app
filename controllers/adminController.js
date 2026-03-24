@@ -237,3 +237,143 @@ export const getAdminDatabaseDetails = async (req, res) => {
   }
 };
 
+export const getAdminUsers = async (req, res) => {
+  try {
+    const users = await User.find({}, "name email isAdmin createdAt updatedAt")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.json({
+      success: true,
+      count: users.length,
+      users,
+    });
+  } catch (error) {
+    console.error("Admin users list error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load users list",
+      error: error.message,
+    });
+  }
+};
+
+export const getAdminUserDetails = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user id",
+      });
+    }
+
+    const user = await User.findById(userId, "name email isAdmin createdAt updatedAt").lean();
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const since7d = getSinceDate(7);
+
+    const [contactsCount, campaignsCount, recentContacts, recentCampaigns, campaignStatusRows, campaignIds] =
+      await Promise.all([
+        Contact.countDocuments({ owner: userId }),
+        Campaign.countDocuments({ owner: userId }),
+        Contact.find({ owner: userId }, "name phone email batchName tags createdAt")
+          .sort({ createdAt: -1 })
+          .limit(20)
+          .lean(),
+        Campaign.find(
+          { owner: userId },
+          "name message mediaPath mediaType status scheduledAt sentAt stats createdAt updatedAt"
+        )
+          .sort({ createdAt: -1 })
+          .limit(20)
+          .lean(),
+        Campaign.aggregate([
+          { $match: { owner: new mongoose.Types.ObjectId(userId) } },
+          { $group: { _id: "$status", count: { $sum: 1 } } },
+          { $sort: { count: -1 } },
+        ]),
+        Campaign.find({ owner: userId }, "_id").lean(),
+      ]);
+
+    const campaignIdList = campaignIds.map((c) => c._id);
+    const messageFilter = campaignIdList.length ? { campaignId: { $in: campaignIdList } } : null;
+
+    const [
+      messagesCount,
+      messagesLast7d,
+      campaignsLast7d,
+      contactsLast7d,
+      messageStatusRows,
+      recentMessages,
+      campaignsLast30Days,
+      contactsLast30Days,
+      messagesLast30Days,
+    ] = await Promise.all([
+      messageFilter ? MessageLog.countDocuments(messageFilter) : 0,
+      messageFilter ? MessageLog.countDocuments({ ...messageFilter, createdAt: { $gte: since7d } }) : 0,
+      Campaign.countDocuments({ owner: userId, createdAt: { $gte: since7d } }),
+      Contact.countDocuments({ owner: userId, createdAt: { $gte: since7d } }),
+      messageFilter
+        ? MessageLog.aggregate([
+            { $match: messageFilter },
+            { $group: { _id: "$status", count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+          ])
+        : [],
+      messageFilter
+        ? MessageLog.find(messageFilter, "campaignId contactId to body status error createdAt")
+            .sort({ createdAt: -1 })
+            .limit(30)
+            .populate("campaignId", "name")
+            .populate("contactId", "name phone")
+            .lean()
+        : [],
+      getDailyCounts(Campaign, "createdAt", 30, { owner: new mongoose.Types.ObjectId(userId) }),
+      getDailyCounts(Contact, "createdAt", 30, { owner: new mongoose.Types.ObjectId(userId) }),
+      campaignIdList.length
+        ? getDailyCounts(MessageLog, "createdAt", 30, { campaignId: { $in: campaignIdList } })
+        : buildDailySeries([], getSinceDate(30), 30),
+    ]);
+
+    return res.json({
+      success: true,
+      user,
+      totals: {
+        contacts: contactsCount,
+        campaigns: campaignsCount,
+        messages: messagesCount,
+      },
+      usage7d: {
+        contactsCreated: contactsLast7d,
+        campaignsCreated: campaignsLast7d,
+        messagesLogged: messagesLast7d,
+      },
+      campaignStatusBreakdown: toBreakdownMap(campaignStatusRows),
+      messageStatusBreakdown: toBreakdownMap(messageStatusRows),
+      charts: {
+        contactsLast30Days,
+        campaignsLast30Days,
+        messagesLast30Days,
+      },
+      recent: {
+        contacts: recentContacts,
+        campaigns: recentCampaigns,
+        messages: recentMessages,
+      },
+    });
+  } catch (error) {
+    console.error("Admin user details error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load user details",
+      error: error.message,
+    });
+  }
+};

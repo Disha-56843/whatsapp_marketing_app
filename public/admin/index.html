@@ -122,6 +122,7 @@
       }
 
       input,
+      select,
       button {
         border-radius: 10px;
         border: 1px solid var(--line);
@@ -131,6 +132,11 @@
 
       input {
         width: 100%;
+      }
+
+      select {
+        width: 100%;
+        background: #fff;
       }
 
       button {
@@ -256,6 +262,76 @@
         <table id="dbTable">
           <thead>
             <tr><th>Collection</th><th>Documents</th><th>Indexes</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <h3>Selected User</h3>
+        <div class="controls">
+          <select id="selectedUserId">
+            <option value="">Select user</option>
+          </select>
+          <button id="loadUserBtn">Load User Data</button>
+          <button id="refreshUserBtn" class="secondary">Refresh User</button>
+        </div>
+        <div id="userMessage" class="message"></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <h3>User Profile</h3>
+          <div id="userProfile"></div>
+        </div>
+        <div class="panel">
+          <h3>User Totals</h3>
+          <div class="row" id="userTotals"></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <h3>User Usage (7 Days)</h3>
+          <div class="row" id="userUsage7d"></div>
+        </div>
+        <div class="panel">
+          <h3>User Campaign Status</h3>
+          <pre id="userCampaignStatus"></pre>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>User Message Status</h3>
+        <pre id="userMessageStatus"></pre>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <h3>User Recent Contacts</h3>
+          <table id="userContactsTable">
+            <thead>
+              <tr><th>Name</th><th>Phone</th><th>Email</th><th>Created</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="panel">
+          <h3>User Recent Campaigns</h3>
+          <table id="userCampaignsTable">
+            <thead>
+              <tr><th>Name</th><th>Status</th><th>Sent</th><th>Created</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>User Recent Messages</h3>
+        <table id="userMessagesTable">
+          <thead>
+            <tr><th>Campaign</th><th>Contact</th><th>Status</th><th>Created</th></tr>
           </thead>
           <tbody></tbody>
         </table>

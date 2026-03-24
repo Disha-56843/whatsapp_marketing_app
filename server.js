@@ -2,114 +2,124 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
+import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import "dotenv/config";
-import connectDB from "./config/db.js";
-import { apiLimiter } from "./middleware/rateLimiter.js";
+import fs from "fs";
+import cron from "node-cron";
 
-// Routes
+import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import contactRoutes from "./routes/contactRoutes.js";
 import campaignRoutes from "./routes/campaignRoutes.js";
-import adminRoutes from "./routes/adminRoutes.js";
-import { getWhatsAppConfigStatus } from "./utils/whatsappCloudService.js";
+import { apiLimiter } from "./middleware/rateLimiter.js";
+import Campaign from "./models/campaignModel.js";
+import { dispatchCampaignMessages } from "./controllers/campaignController.js";
 
-const app = express();
+dotenv.config();
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ✅ FIX: Trust Render's proxy — MUST be before rate limiter
-// Without this, express-rate-limit crashes with ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
-app.set("trust proxy", 1);
+const app = express();
 
-app.use(helmet());
+// ─── Connect DB ────────────────────────────────────────────────────────────────
+await connectDB();
 
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL || "*",
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "x-auth-token"],
-    credentials: true,
-  })
-);
-
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-app.use("/admin", express.static(path.join(__dirname, "public/admin")));
-
-if (process.env.NODE_ENV !== "production") {
-  app.use(morgan("dev"));
+// ─── Ensure uploads directory exists ─────────────────────────────────────────
+const uploadsDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
+// ─── Middleware ────────────────────────────────────────────────────────────────
+app.use(helmet({
+  // Allow images to be served cross-origin (needed for media in campaigns)
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+}));
+
+app.use(cors({
+  origin: "*", // Tighten this to your Flutter app's origin in production
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "x-auth-token"],
+}));
+
+app.use(morgan("dev"));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// ─── FIX: Serve uploaded media files as static assets ────────────────────────
+// Without this the mediaUrl returned by /upload-media is a dead link.
+app.use("/uploads", express.static(uploadsDir));
+
+// ─── Rate limiting ─────────────────────────────────────────────────────────────
 app.use("/api", apiLimiter);
 
-app.use("/api/v1/auth", authRoutes);
-app.use("/api/v1/contacts", contactRoutes);
-app.use("/api/v1/campaigns", campaignRoutes);
-app.use("/api/v1/admin", adminRoutes);
+// ─── Routes ────────────────────────────────────────────────────────────────────
+app.use("/api/auth", authRoutes);
+app.use("/api/contacts", contactRoutes);
+app.use("/api/campaigns", campaignRoutes);
 
-app.get("/api/health", (req, res) => {
-  const wa = getWhatsAppConfigStatus();
-  res.json({
-    success: true,
-    status: "OK",
-    timestamp: new Date().toISOString(),
-    version: "2.0.0",
-    whatsappCloud: {
-      valid: wa.valid,
-      hasPhoneNumberId: wa.hasPhoneNumberId,
-      hasAccessToken: wa.hasAccessToken,
-      graphApiVersion: wa.graphApiVersion,
-    },
-  });
-});
-
+// ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   res.json({
     success: true,
-    message: "WhatsApp Marketing API v2.0",
-    docs: "/api/health",
-    endpoints: {
-      auth: "/api/v1/auth",
-      contacts: "/api/v1/contacts",
-      campaigns: "/api/v1/campaigns",
-      adminApi: "/api/v1/admin",
-      adminPanel: "/admin",
-    },
+    message: "WhatsApp Marketing API is running",
+    version: "2.0.0",
+    timestamp: new Date().toISOString(),
   });
 });
 
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", uptime: process.uptime() });
+});
+
+// ─── 404 handler ──────────────────────────────────────────────────────────────
 app.use((req, res) => {
-  res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found.` });
+  res.status(404).json({ success: false, message: "Route not found" });
 });
 
+// ─── Global error handler ─────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
-  console.error("❌ Unhandled error:", err.stack);
-  res.status(500).json({
-    success: false,
-    message: "Something went wrong on our end. Please try again.",
-    ...(process.env.NODE_ENV === "development" && { error: err.message }),
-  });
+  console.error("❌ Unhandled error:", err);
+  res.status(500).json({ success: false, message: "Internal server error" });
 });
 
-const PORT = process.env.PORT || 5000;
+// ─── FIX: Cron job — resumes campaigns stuck in "sending" on server restart ───
+// Render free tier restarts frequently. Without this, campaigns that were
+// mid-send become stuck in "sending" forever after a restart.
+// Runs every 5 minutes. Only picks up campaigns with status="sending"
+// that have not been touched in the last 10 minutes (avoids re-firing active ones).
+cron.schedule("*/5 * * * *", async () => {
+  try {
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    const stuckCampaigns = await Campaign.find({
+      status: "sending",
+      updatedAt: { $lt: tenMinutesAgo },
+    });
 
-connectDB().then(() => {
-  app.listen(PORT, () => {
-    const wa = getWhatsAppConfigStatus();
-    console.log("");
-    console.log("=========================================");
-    console.log("🚀  WhatsApp Marketing API  v2.0");
-    console.log("=========================================");
-    console.log(`📡  Port     : ${PORT}`);
-    console.log(`🌍  Env      : ${process.env.NODE_ENV || "development"}`);
-    console.log(`🔗  Base URL : http://localhost:${PORT}/api/v1`);
-    console.log(
-      `📨  WhatsApp : configured=${wa.valid} phoneId=${wa.hasPhoneNumberId} token=${wa.hasAccessToken}`
-    );
-    console.log("=========================================");
-    console.log("");
-  });
+    if (stuckCampaigns.length > 0) {
+      console.log(`⚠️ Found ${stuckCampaigns.length} stuck campaign(s) — resuming`);
+    }
+
+    for (const campaign of stuckCampaigns) {
+      console.log(`🔄 Resuming campaign: ${campaign._id}`);
+      dispatchCampaignMessages({
+        campaignId: campaign._id,
+        userId: campaign.owner,
+      }).catch((err) => {
+        console.error(`❌ Resume failed for ${campaign._id}:`, err.message);
+      });
+    }
+  } catch (err) {
+    console.error("❌ Cron job error:", err.message);
+  }
+});
+
+// ─── Start server ──────────────────────────────────────────────────────────────
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📁 Uploads served at /uploads`);
+  console.log(`🔁 Campaign resume cron active (every 5 min)`);
 });

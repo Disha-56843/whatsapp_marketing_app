@@ -1,6 +1,7 @@
 const $ = (id) => document.getElementById(id);
 
 let currentToken = "";
+let selectedUserId = "";
 
 const setMessage = (id, text, type = "") => {
   const node = $(id);
@@ -14,6 +15,12 @@ const saveToken = (token) => {
   sessionStorage.setItem("admin_token", token);
   $("token").value = token;
   currentToken = token;
+};
+
+const saveSelectedUser = (userId) => {
+  selectedUserId = userId || "";
+  sessionStorage.setItem("admin_selected_user", selectedUserId);
+  $("selectedUserId").value = selectedUserId;
 };
 
 const api = async (path) => {
@@ -47,6 +54,81 @@ const renderRows = (tableId, rows, columns) => {
 };
 
 const formatDate = (value) => (value ? new Date(value).toLocaleString() : "-");
+
+const loadUsers = async () => {
+  const payload = await api("/api/v1/admin/users");
+  const users = payload.users || [];
+  const select = $("selectedUserId");
+  select.innerHTML = '<option value="">Select user</option>';
+
+  users.forEach((user) => {
+    const option = document.createElement("option");
+    option.value = user._id;
+    option.textContent = `${user.name || "Unknown"} (${user.email || "no-email"})`;
+    select.appendChild(option);
+  });
+
+  const storedUser = sessionStorage.getItem("admin_selected_user") || "";
+  if (storedUser && users.some((u) => u._id === storedUser)) {
+    saveSelectedUser(storedUser);
+  }
+
+  return users;
+};
+
+const renderUserDetails = (data) => {
+  $("userProfile").innerHTML = `
+    <p><strong>Name:</strong> ${data.user.name || "-"}</p>
+    <p><strong>Email:</strong> ${data.user.email || "-"}</p>
+    <p><strong>Role:</strong> <span class="tag">${data.user.isAdmin ? "admin" : "user"}</span></p>
+    <p><strong>Created:</strong> ${formatDate(data.user.createdAt)}</p>
+    <p><strong>Updated:</strong> ${formatDate(data.user.updatedAt)}</p>
+  `;
+
+  renderStats($("userTotals"), data.totals || {});
+  renderStats($("userUsage7d"), data.usage7d || {});
+  $("userCampaignStatus").textContent = JSON.stringify(data.campaignStatusBreakdown || {}, null, 2);
+  $("userMessageStatus").textContent = JSON.stringify(data.messageStatusBreakdown || {}, null, 2);
+
+  renderRows("userContactsTable", data?.recent?.contacts || [], [
+    (r) => r.name || "-",
+    (r) => r.phone || "-",
+    (r) => r.email || "-",
+    (r) => formatDate(r.createdAt),
+  ]);
+
+  renderRows("userCampaignsTable", data?.recent?.campaigns || [], [
+    (r) => r.name || "-",
+    (r) => `<span class="tag">${r.status || "-"}</span>`,
+    (r) => (r.stats && r.stats.sent) || 0,
+    (r) => formatDate(r.createdAt),
+  ]);
+
+  renderRows("userMessagesTable", data?.recent?.messages || [], [
+    (r) => (r.campaignId && r.campaignId.name) || "-",
+    (r) => (r.contactId && (r.contactId.name || r.contactId.phone)) || "-",
+    (r) => `<span class="tag">${r.status || "-"}</span>`,
+    (r) => formatDate(r.createdAt),
+  ]);
+};
+
+const loadSelectedUser = async () => {
+  selectedUserId = $("selectedUserId").value;
+  if (!selectedUserId) {
+    setMessage("userMessage", "Please select a user.", "error");
+    return;
+  }
+
+  try {
+    setMessage("userMessage", "Loading selected user...");
+    const payload = await api(`/api/v1/admin/users/${selectedUserId}`);
+    renderUserDetails(payload);
+    saveSelectedUser(selectedUserId);
+    setMessage("userMessage", "User data loaded.", "success");
+  } catch (error) {
+    setMessage("userMessage", `Unable to load user data: ${error.message}`, "error");
+  }
+};
 
 const login = async () => {
   const email = $("email").value.trim();
@@ -132,6 +214,14 @@ const loadDashboard = async () => {
       (r) => r.indexes,
     ]);
 
+    const users = await loadUsers();
+    if (!selectedUserId && users.length > 0) {
+      saveSelectedUser(users[0]._id);
+    }
+    if (selectedUserId) {
+      await loadSelectedUser();
+    }
+
     saveToken(currentToken);
     setMessage("dashboardMessage", "Dashboard loaded.", "success");
   } catch (error) {
@@ -142,6 +232,11 @@ const loadDashboard = async () => {
 $("loginBtn").addEventListener("click", login);
 $("loadBtn").addEventListener("click", loadDashboard);
 $("refreshBtn").addEventListener("click", loadDashboard);
+$("loadUserBtn").addEventListener("click", loadSelectedUser);
+$("refreshUserBtn").addEventListener("click", loadSelectedUser);
+$("selectedUserId").addEventListener("change", () => {
+  saveSelectedUser($("selectedUserId").value);
+});
 $("password").addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     login();
@@ -151,4 +246,9 @@ $("password").addEventListener("keydown", (event) => {
 const existingToken = readToken();
 if (existingToken) {
   saveToken(existingToken);
+}
+
+const existingSelectedUser = sessionStorage.getItem("admin_selected_user");
+if (existingSelectedUser) {
+  selectedUserId = existingSelectedUser;
 }
