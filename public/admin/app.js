@@ -68,11 +68,12 @@ const login = async () => {
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || "Login failed");
 
-    if (!data?.data?.token) {
+    const token = data?.token || data?.data?.token;
+    if (!token) {
       throw new Error("Token missing in login response");
     }
 
-    saveToken(data.data.token);
+    saveToken(token);
     setMessage("loginMessage", "Login successful. Loading dashboard...", "success");
     await loadDashboard();
   } catch (error) {
@@ -151,4 +152,3 @@ const existingToken = readToken();
 if (existingToken) {
   saveToken(existingToken);
 }
-
