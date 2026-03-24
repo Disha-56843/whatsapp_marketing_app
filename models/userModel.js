@@ -24,6 +24,10 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true, // Auto-verified until we have a domain
     },
+    isAdmin: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

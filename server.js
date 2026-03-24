@@ -12,6 +12,7 @@ import { apiLimiter } from "./middleware/rateLimiter.js";
 import authRoutes from "./routes/authRoutes.js";
 import contactRoutes from "./routes/contactRoutes.js";
 import campaignRoutes from "./routes/campaignRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 import { getWhatsAppConfigStatus } from "./utils/whatsappCloudService.js";
 
 const app = express();
@@ -36,6 +37,7 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/admin", express.static(path.join(__dirname, "public/admin")));
 
 if (process.env.NODE_ENV !== "production") {
   app.use(morgan("dev"));
@@ -46,6 +48,7 @@ app.use("/api", apiLimiter);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/contacts", contactRoutes);
 app.use("/api/v1/campaigns", campaignRoutes);
+app.use("/api/v1/admin", adminRoutes);
 
 app.get("/api/health", (req, res) => {
   const wa = getWhatsAppConfigStatus();
@@ -72,6 +75,8 @@ app.get("/", (req, res) => {
       auth: "/api/v1/auth",
       contacts: "/api/v1/contacts",
       campaigns: "/api/v1/campaigns",
+      adminApi: "/api/v1/admin",
+      adminPanel: "/admin",
     },
   });
 });

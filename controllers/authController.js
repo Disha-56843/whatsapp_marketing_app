@@ -5,6 +5,14 @@ import { validationResult } from "express-validator";
 import { validateEmailDomain } from "../utils/emailValidator.js";
 import { successResponse, errorResponse, validationErrorResponse } from "../utils/apiResponse.js";
 
+const getAdminEmails = () =>
+  new Set(
+    (process.env.ADMIN_EMAILS || "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean)
+  );
+
 // ─── REGISTER ─────────────────────────────────────────────────────────────────
 export const registerUser = async (req, res) => {
   const errors = validationResult(req);
@@ -25,12 +33,14 @@ export const registerUser = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
+    const isAdmin = getAdminEmails().has(email.toLowerCase());
 
     const user = await User.create({
       name,
       email,
       password: hashedPassword,
       isEmailVerified: true,
+      isAdmin,
     });
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
@@ -41,7 +51,7 @@ export const registerUser = async (req, res) => {
       res,
       {
         token,
-        user: { id: user._id, name: user.name, email: user.email },
+        user: { id: user._id, name: user.name, email: user.email, isAdmin: user.isAdmin },
       },
       "Account created successfully!",
       201
@@ -74,7 +84,7 @@ export const loginUser = async (req, res) => {
 
     return successResponse(res, {
       token,
-      user: { id: user._id, name: user.name, email: user.email },
+      user: { id: user._id, name: user.name, email: user.email, isAdmin: user.isAdmin },
     }, "Login successful");
   } catch (error) {
     console.error("❌ Login error:", error);

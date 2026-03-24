@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Panel | WhatsApp Marketing</title>
+    <style>
+      :root {
+        --bg: #f6f8f4;
+        --panel: #ffffff;
+        --ink: #1e2936;
+        --soft: #5e6b78;
+        --line: #dce3d7;
+        --accent: #0f766e;
+        --accent-2: #b45309;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Trebuchet MS", Verdana, sans-serif;
+        background:
+          radial-gradient(circle at top right, #d8efe8 0, transparent 35%),
+          radial-gradient(circle at bottom left, #faebd4 0, transparent 40%),
+          var(--bg);
+        color: var(--ink);
+      }
+
+      .wrap {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px 16px 40px;
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: 30px;
+      }
+
+      .sub {
+        color: var(--soft);
+        margin: 0 0 20px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px;
+        margin-bottom: 14px;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 12px;
+      }
+
+      .stat {
+        background: #f9fbf8;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+      }
+
+      .stat small {
+        display: block;
+        color: var(--soft);
+        font-size: 12px;
+      }
+
+      .stat strong {
+        display: block;
+        font-size: 24px;
+        margin-top: 6px;
+      }
+
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 8px 6px;
+        text-align: left;
+      }
+
+      th {
+        color: var(--soft);
+      }
+
+      .tag {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 700;
+        background: #e8f3ed;
+        color: var(--accent);
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: 1fr auto auto;
+        gap: 10px;
+      }
+
+      input,
+      button {
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        padding: 10px 12px;
+        font-size: 14px;
+      }
+
+      input {
+        width: 100%;
+      }
+
+      button {
+        cursor: pointer;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 700;
+      }
+
+      button.secondary {
+        background: var(--accent-2);
+      }
+
+      pre {
+        max-height: 360px;
+        overflow: auto;
+        background: #f5f7f4;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px;
+      }
+
+      @media (max-width: 780px) {
+        .grid-2 {
+          grid-template-columns: 1fr;
+        }
+
+        .controls {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Admin Control Panel</h1>
+      <p class="sub">App details, database details, and usage insights.</p>
+
+      <div class="panel">
+        <div class="controls">
+          <input id="token" type="password" placeholder="Paste admin JWT token (from login API)" />
+          <button id="loadBtn">Load Dashboard</button>
+          <button id="refreshBtn" class="secondary">Refresh</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Totals</h3>
+        <div class="row" id="totals"></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <h3>Usage (7 Days)</h3>
+          <div id="usage7d"></div>
+        </div>
+        <div class="panel">
+          <h3>App & Database</h3>
+          <div id="meta"></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <h3>Campaign Status Breakdown</h3>
+          <pre id="campaignStatus"></pre>
+        </div>
+        <div class="panel">
+          <h3>Message Status Breakdown</h3>
+          <pre id="messageStatus"></pre>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <h3>Recent Campaigns</h3>
+          <table id="campaignTable">
+            <thead>
+              <tr><th>Name</th><th>Status</th><th>Owner</th><th>Created</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="panel">
+          <h3>Recent Users</h3>
+          <table id="userTable">
+            <thead>
+              <tr><th>Name</th><th>Email</th><th>Role</th><th>Created</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Database Collections</h3>
+        <table id="dbTable">
+          <thead>
+            <tr><th>Collection</th><th>Documents</th><th>Indexes</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let currentToken = "";
+
+      const api = async (path) => {
+        const response = await fetch(path, {
+          headers: { Authorization: `Bearer ${currentToken}` },
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || "Request failed");
+        return data;
+      };
+
+      const renderStats = (container, stats) => {
+        container.innerHTML = "";
+        Object.entries(stats || {}).forEach(([key, value]) => {
+          const card = document.createElement("div");
+          card.className = "stat";
+          card.innerHTML = `<small>${key}</small><strong>${value}</strong>`;
+          container.appendChild(card);
+        });
+      };
+
+      const renderRows = (tableId, rows, columns) => {
+        const tbody = document.querySelector(`#${tableId} tbody`);
+        tbody.innerHTML = "";
+        rows.forEach((row) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = columns.map((fn) => `<td>${fn(row)}</td>`).join("");
+          tbody.appendChild(tr);
+        });
+      };
+
+      const formatDate = (value) => (value ? new Date(value).toLocaleString() : "-");
+
+      const load = async () => {
+        currentToken = $("token").value.trim();
+        if (!currentToken) {
+          alert("Please paste your admin JWT token.");
+          return;
+        }
+
+        try {
+          const [overview, recent, database] = await Promise.all([
+            api("/api/v1/admin/overview"),
+            api("/api/v1/admin/recent-activity"),
+            api("/api/v1/admin/database"),
+          ]);
+
+          renderStats($("totals"), overview.totals);
+          renderStats($("usage7d"), overview.usage7d);
+
+          $("meta").innerHTML = `
+            <p><strong>Admin:</strong> ${overview.admin.name} (${overview.admin.email})</p>
+            <p><strong>Environment:</strong> ${overview.app.nodeEnv}</p>
+            <p><strong>Uptime (sec):</strong> ${overview.app.uptimeSeconds}</p>
+            <p><strong>WhatsApp Config:</strong> <span class="tag">${overview.app.whatsappCloud.valid ? "OK" : "Missing"}</span></p>
+            <p><strong>DB:</strong> ${(overview.database && overview.database.db) || "-"}</p>
+            <p><strong>Storage (MB):</strong> ${(overview.database && overview.database.storageSizeMB) || "-"}</p>
+          `;
+
+          $("campaignStatus").textContent = JSON.stringify(overview.campaignStatusBreakdown, null, 2);
+          $("messageStatus").textContent = JSON.stringify(overview.messageStatusBreakdown, null, 2);
+
+          renderRows("campaignTable", recent.recentCampaigns || [], [
+            (r) => r.name || "-",
+            (r) => `<span class="tag">${r.status || "-"}</span>`,
+            (r) => (r.owner && r.owner.email) || "-",
+            (r) => formatDate(r.createdAt),
+          ]);
+
+          renderRows("userTable", recent.recentUsers || [], [
+            (r) => r.name || "-",
+            (r) => r.email || "-",
+            (r) => `<span class="tag">${r.isAdmin ? "admin" : "user"}</span>`,
+            (r) => formatDate(r.createdAt),
+          ]);
+
+          renderRows("dbTable", database.collections || [], [
+            (r) => r.name,
+            (r) => r.documents,
+            (r) => r.indexes,
+          ]);
+        } catch (error) {
+          alert(`Unable to load dashboard: ${error.message}`);
+        }
+      };
+
+      $("loadBtn").addEventListener("click", load);
+      $("refreshBtn").addEventListener("click", load);
+    </script>
+  </body>
+</html>
+
