@@ -124,20 +124,4 @@ export const getMe = async (req, res) => {
   }
 };
 
-// ─── Google Login ─────────────────────────────────────────────────────────
 
-const { OAuth2Client } = require('google-auth-library');
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
-router.post('/auth/google', async (req, res) => {
-  const { idToken, email, name } = req.body;
-  const ticket = await client.verifyIdToken({
-    idToken,
-    audience: process.env.GOOGLE_CLIENT_ID,
-  });
-  // Find or create user by email, then return your normal JWT
-  let user = await User.findOne({ email });
-  if (!user) user = await User.create({ name, email, password: '' });
-  const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET);
-  res.json({ success: true, token });
-});
